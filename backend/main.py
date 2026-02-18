@@ -137,8 +137,8 @@ async def clear_index():
         UPLOADS_DIR.mkdir(exist_ok=True)
     return {"message": "Index and uploads cleared successfully"}
 
-PORT = int(os.environ.get("PORT", 8000))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
+@app.on_event("startup")
+async def startup_event():
+    port = os.getenv("PORT", "8000")
+    print(f"🚀 Server starting on 0.0.0.0:{port}")
+    print("✅ Ready for Render port detection!")

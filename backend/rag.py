@@ -14,7 +14,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-from langchain.chains import RetrievalQA
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
@@ -133,20 +134,24 @@ def ask_question(query):
     vectorstore = get_vectorstore()
     
     try:
+        from langchain_groq import ChatGroq
+        from langchain_core.prompts import ChatPromptTemplate
+        
         llm = ChatGroq(
             groq_api_key=GROQ_API_KEY,
             model_name="llama-3.1-8b-instant",
             temperature=0
         )
-
-        qa = RetrievalQA.from_chain_type(
-            llm=llm,
-            retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
-            return_source_documents=False,
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+        prompt = ChatPromptTemplate.from_template(
+            "Answer based on context: {context}\n\nQuestion: {question}"
         )
-
-        result = qa.run(query)
-        return result
+        
+        chain = create_retrieval_chain(retriever, prompt | llm)
+        result = chain.invoke({"input": query})
+        
+        return result["answer"]
 
     except Exception as e:
-        raise RuntimeError(f"Error during question answering: {str(e)}")
+        raise RuntimeError(f"Error during QA: {str(e)}")
+

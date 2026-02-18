@@ -3,13 +3,13 @@ import shutil
 from typing import List
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from rag import process_files, process_website, ask_question, get_vectorstore
 
-app = FastAPI(title="RAG Document QA API")
+app = FastAPI(title="Multi-Document Research Assistant")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +30,7 @@ class QuestionRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"message": "RAG API is running ✅"}
+    return {"message": "✅ Multi-Document RAG Assistant Live!", "status": "ready"}
 
 @app.get("/status")
 def status():
@@ -55,7 +55,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
                     detail=f"{file.filename} is not supported. Use PDF, TXT, DOCX, CSV"
                 )
 
-            filename = f"{Path(file.filename).stem}_{len(file_paths)}.{Path(file.filename).suffix}"
+            filename = f"{Path(file.filename).stem}_{len(file_paths)}{Path(file.filename).suffix}"
             temp_path = UPLOADS_DIR / filename
             
             with open(temp_path, "wb") as buffer:
@@ -130,13 +130,15 @@ async def ask(request: QuestionRequest):
 @app.delete("/clear/")
 async def clear_index():
     """Clear all indexed documents"""
-    import shutil
     if Path("./faiss_index").exists():
         shutil.rmtree("./faiss_index")
-    return {"message": "Index cleared successfully"}
+    if UPLOADS_DIR.exists():
+        shutil.rmtree(UPLOADS_DIR)
+        UPLOADS_DIR.mkdir(exist_ok=True)
+    return {"message": "Index and uploads cleared successfully"}
 
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.environ.get("PORT", 8000))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")

@@ -116,7 +116,6 @@ def process_files(file_paths: List[str]):
         print("❌ No documents loaded")
         return None
 
-    # Split documents
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -125,10 +124,8 @@ def process_files(file_paths: List[str]):
     splits = splitter.split_documents(docs)
     print(f"✂️ Split into {len(splits)} chunks")
 
-    # Get embeddings
     embeddings = get_embeddings()
-    
-    # Create or load FAISS index
+
     index_path = str(INDEX_DIR)
     try:
         print("🔄 Loading existing index...")
@@ -143,7 +140,6 @@ def process_files(file_paths: List[str]):
         print("🆕 Creating new index...")
         vectorstore = FAISS.from_documents(splits, embeddings)
     
-    # Save index
     vectorstore.save_local(index_path)
     print(f"💾 Saved index with {vectorstore.index.ntotal} vectors")
     return vectorstore
@@ -157,8 +153,7 @@ def process_website(url: str):
     
     try:
         print(f"🌐 Fetching website: {url}")
-        
-        # Pre-check URL accessibility
+
         response = requests.get(
             url, 
             timeout=15, 
@@ -169,7 +164,6 @@ def process_website(url: str):
         response.raise_for_status()
         print(f"✅ Website OK: {len(response.text)} chars")
         
-        # ✅ FIXED: Use header_template (NOT headers)
         loader = WebBaseLoader(
             url,
             header_template={
@@ -185,7 +179,6 @@ def process_website(url: str):
 
         print(f"📄 Loaded: {len(docs)} docs")
         
-        # Process chunks
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,

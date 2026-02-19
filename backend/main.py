@@ -2,14 +2,13 @@ import os
 import shutil
 from typing import List
 from pathlib import Path
-
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from rag import process_files, process_website, ask_question, get_vectorstore
+from rag import process_files, process_website, ask_question
 
-app = FastAPI(title="Multi-Document Research Assistant")
+app = FastAPI(title="Multi-Document Research Assistant", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +20,7 @@ app.add_middleware(
 
 UPLOADS_DIR = Path("./uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
+INDEX_DIR = Path("./faiss_index")
 
 class URLRequest(BaseModel):
     url: str
@@ -35,9 +35,8 @@ def root():
 @app.get("/status")
 def status():
     """Check if index exists"""
-    if Path("./faiss_index").exists() and any(Path("./faiss_index").iterdir()):
-        return {"status": "ready", "index_exists": True}
-    return {"status": "no_documents", "index_exists": False}
+    index_exists = INDEX_DIR.exists() and any(INDEX_DIR.iterdir())
+    return {"status": "ready" if index_exists else "no_documents", "index_exists": index_exists}
 
 @app.post("/upload/")
 async def upload_files(files: List[UploadFile] = File(...)):
@@ -48,14 +47,17 @@ async def upload_files(files: List[UploadFile] = File(...)):
     file_paths = []
 
     try:
-        for file in files:
+        for old_file in UPLOADS_DIR.glob("*"):
+            old_file.unlink()
+
+        for i, file in enumerate(files):
             if not file.filename.lower().endswith(allowed_extensions):
                 raise HTTPException(
                     status_code=400,
                     detail=f"{file.filename} is not supported. Use PDF, TXT, DOCX, CSV"
                 )
 
-            filename = f"{Path(file.filename).stem}_{len(file_paths)}{Path(file.filename).suffix}"
+            filename = f"{Path(file.filename).stem}_{i:03d}{Path(file.filename).suffix}"
             temp_path = UPLOADS_DIR / filename
             
             with open(temp_path, "wb") as buffer:
@@ -112,15 +114,18 @@ async def ask(request: QuestionRequest):
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     try:
-        print("🔍 Query received:", request.query[:50] + "...")
+        print("🔍 Query received:", request.query[:50] + "..." if len(request.query) > 50 else request.query)
+        
         answer = ask_question(request.query) 
+        
         return {
+            "question": request.query,
             "answer": answer,
             "sources": [] 
         }
 
     except ValueError as e:
-        if "No documents uploaded yet" in str(e):
+        if "No documents indexed" in str(e) or "No documents uploaded" in str(e):
             raise HTTPException(status_code=400, detail="No documents indexed. Upload files/website first.")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -130,15 +135,22 @@ async def ask(request: QuestionRequest):
 @app.delete("/clear/")
 async def clear_index():
     """Clear all indexed documents"""
-    if Path("./faiss_index").exists():
-        shutil.rmtree("./faiss_index")
+    if INDEX_DIR.exists():
+        shutil.rmtree(INDEX_DIR)
+        print("🗑️ Cleared FAISS index")
     if UPLOADS_DIR.exists():
-        shutil.rmtree(UPLOADS_DIR)
-        UPLOADS_DIR.mkdir(exist_ok=True)
+        for file in UPLOADS_DIR.glob("*"):
+            file.unlink()
+        print("🗑️ Cleared uploads")
+    print("✅ Index cleared successfully")
     return {"message": "Index and uploads cleared successfully"}
 
-@app.on_event("startup")
-async def startup_event():
-    port = os.getenv("PORT", "8000")
-    print(f"🚀 Server starting on 0.0.0.0:{port}")
-    print("✅ Ready for Render port detection!")
+@app.get("/health")
+async def health():
+    """Render health check"""
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    port = os.getenv("PORT", 8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)

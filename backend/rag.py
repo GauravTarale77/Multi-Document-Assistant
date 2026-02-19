@@ -1,23 +1,21 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from typing import List
+from fastapi import HTTPException
 
 load_dotenv()
 os.environ['USER_AGENT'] = 'MultiDocResearchAssistant/1.0'
 
 from langchain_community.document_loaders import (
-    PyPDFLoader,
-    TextLoader,
-    CSVLoader,
-    UnstructuredWordDocumentLoader,
-    WebBaseLoader,
+    PyPDFLoader, TextLoader, CSVLoader, 
+    UnstructuredWordDocumentLoader, WebBaseLoader,
 )
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings 
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
@@ -25,32 +23,47 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY not found in environment")
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
-
 INDEX_DIR = Path("./faiss_index")
 INDEX_DIR.mkdir(exist_ok=True)
 
-def get_vectorstore():
-    """Load existing FAISS index securely."""
-    if not INDEX_DIR.exists() or not any(INDEX_DIR.iterdir()):
-        raise ValueError("No documents indexed. Upload files first via process_files() or process_website().")
-    
-    return FAISS.load_local(
-        str(INDEX_DIR), 
-        embeddings, 
-        allow_dangerous_deserialization=True
-    )
+_embeddings_cache = {}
+_vectorstore_cache = {}
 
-def load_documents(file_paths):
+def get_embeddings() -> HuggingFaceEmbeddings:
+    """Lazy load embeddings (90MB) on first use only."""
+    if 'embeddings' not in _embeddings_cache:
+        print("🔄 Loading embedding model (first time only)...")
+        _embeddings_cache['embeddings'] = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'},
+            encode_kwargs={'normalize_embeddings': False}
+        )
+        print("✅ Embedding model loaded and cached")
+    return _embeddings_cache['embeddings']
+
+def get_vectorstore():
+    """Load existing FAISS index with lazy embeddings."""
+    if not INDEX_DIR.exists() or not any(INDEX_DIR.iterdir()):
+        raise HTTPException(status_code=400, detail="No documents indexed. Upload files first via /index-files/")
+    
+    if 'vectorstore' not in _vectorstore_cache:
+        embeddings = get_embeddings()
+        _vectorstore_cache['vectorstore'] = FAISS.load_local(
+            str(INDEX_DIR), 
+            embeddings, 
+            allow_dangerous_deserialization=True
+        )
+    
+    return _vectorstore_cache['vectorstore']
+
+def load_documents(file_paths: List[str]):
     """Load multiple document types."""
     documents = []
     for path in file_paths:
         try:
             if path.endswith(".pdf"):
                 loader = PyPDFLoader(path)
-            elif path.endswith(".txt"):
+            elif path.endswith((".txt", ".md")):
                 loader = TextLoader(path)
             elif path.endswith(".csv"):
                 loader = CSVLoader(path)
@@ -77,7 +90,7 @@ def split_documents(docs):
     )
     return splitter.split_documents(docs)
 
-def process_files(file_paths):
+def process_files(file_paths: List[str]):
     """Process and index local files."""
     docs = load_documents(file_paths)
     if not docs:
@@ -88,6 +101,7 @@ def process_files(file_paths):
     print(f"Split into {len(splits)} chunks")
 
     index_path = str(INDEX_DIR)
+    embeddings = get_embeddings()
     
     try:
         vectorstore = FAISS.load_local(
@@ -105,7 +119,7 @@ def process_files(file_paths):
     print(f"Saved index with {vectorstore.index.ntotal} vectors")
     return vectorstore
 
-def process_website(url):
+def process_website(url: str):
     """Process and index website content."""
     try:
         loader = WebBaseLoader(url)
@@ -115,6 +129,7 @@ def process_website(url):
             return None
 
         splits = split_documents(docs)
+        embeddings = get_embeddings()
 
         index_path = str(INDEX_DIR)
         try:
@@ -135,8 +150,8 @@ def process_website(url):
         print(f"Error processing website: {e}")
         return None
 
-def ask_question(query):
-    """Answer questions using modern LCEL RAG chain (v1.2 compatible)."""
+def ask_question(query: str) -> str:
+    """Answer questions using modern LCEL RAG chain."""
     vectorstore = get_vectorstore()
     
     llm = ChatGroq(
@@ -152,7 +167,7 @@ def ask_question(query):
     
     template = """Answer the question based only on the following context:
 {context}
-    
+
 Question: {question}
 Answer:"""
     

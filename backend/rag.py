@@ -31,17 +31,27 @@ _embeddings_cache = {}
 _vectorstore_cache = {}
 
 def get_embeddings():
-    """Lazy load embeddings (90MB) on first use only."""
-    if 'embeddings' not in _embeddings_cache:
-        print("🔄 Loading embedding model (first time only)...")
-        embeddings_mod = _lazy_import('embeddings')
-        _embeddings_cache['embeddings'] = embeddings_mod.HuggingFaceEmbeddings(
+    """Lightweight embeddings for Render Free Tier."""
+    try:
+        if 'embeddings' in _embedding_cache:
+            return _embedding_cache['embeddings']
+        
+        from langchain_huggingface import HuggingFaceEmbeddings
+        
+        print("🔄 Loading lightweight embeddings...")
+        embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",
             model_kwargs={'device': 'cpu'},
-            encode_kwargs={'normalize_embeddings': False}
+            encode_kwargs={'normalize_embeddings': False},
         )
-        print("✅ Embedding model loaded and cached")
-    return _embeddings_cache['embeddings']
+        _embedding_cache['embeddings'] = embeddings
+        print("✅ Lightweight embeddings cached")
+        return embeddings
+        
+    except Exception as e:
+        print(f"❌ Embeddings failed: {e}")
+        raise
+
 
 def get_vectorstore():
     """Load FAISS index - BULLETPROOF VERSION."""

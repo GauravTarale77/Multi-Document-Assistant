@@ -27,7 +27,7 @@ if not GROQ_API_KEY:
 INDEX_DIR = Path("./faiss_index")
 INDEX_DIR.mkdir(exist_ok=True)
 
-_embeddings_cache = {}
+_embedding_cache = {}
 _vectorstore_cache = {}
 
 def get_embeddings():

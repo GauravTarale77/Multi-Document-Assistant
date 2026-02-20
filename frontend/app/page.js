@@ -234,16 +234,37 @@ export default function App() {
               <p className="font-semibold text-gray-800">📚 Features:</p>
               <ul className="list-disc pl-5 space-y-1 text-sm">
                 <li>Multi-file upload (PDF, TXT, DOCX, CSV)</li>
-                <li>Website content processing</li>
-                <li>Persistent RAG index (survives restarts)</li>
-                <li>FastAPI + Next.js + Groq + LangChain</li>
+                <li>
+                  Tech Stack: Next.js, LLM, LangChain, RAG, Groq API, FastAPI,
+                  FAISS, llama-3.1-8b-instant
+                </li>
               </ul>
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <p className="font-semibold text-amber-800 mb-2">
+                  ⚠️ File Limits (Free Tier):
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-amber-700">
+                  <li>
+                    📄 PDFs: <span className="font-bold">Max 10MB</span>
+                  </li>
+                  <li>
+                    🌐 Websites:{" "}
+                    <span className="font-bold">1-5 page sites</span>{" "}
+                    (blogs/articles)
+                  </li>
+                  <li>⏱️ Processing: 30-90 seconds</li>
+                  <li>💾 Heavy files auto-blocked</li>
+                </ul>
+                <p className="text-xs mt-2 text-amber-600">
+                  Large files? Contact me for custom hosting 🚀
+                </p>
+              </div>
+
               <p className="font-bold text-blue-600 cursor-pointer hover:underline">
                 Contact: gauravtarale67@gmail.com
               </p>
               <p className="text-xs text-gray-500 mt-4 p-3 bg-gray-50 rounded-lg border">
-                Built for portfolio. Tech stack: Next.js 14+, FastAPI, FAISS,
-                llama-3.1-8b-instant (upgrading soon 🚀)
+                Built for portfolio. I will Upgrade it in Future.
               </p>
             </div>
           </div>

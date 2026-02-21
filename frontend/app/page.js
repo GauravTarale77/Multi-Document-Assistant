@@ -3,11 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Info, Upload, Loader2, Trash2 } from "lucide-react";
 
+// const getAPI_BASE = () => {
+//   if (typeof window !== "undefined") {
+//     return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+//   }
+//   return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+// };
 const getAPI_BASE = () => {
-  if (typeof window !== "undefined") {
-    return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-  }
-  return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+  return "https://multi-document-assistant-rag.onrender.com";
 };
 
 export default function App() {

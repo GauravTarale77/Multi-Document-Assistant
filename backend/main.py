@@ -2,7 +2,9 @@ import os
 import shutil
 from typing import List
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request 
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from rag import process_files, process_website, ask_question
@@ -16,6 +18,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(500)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Processing timeout - try smaller file (under 10MB)"},
+        headers={"Access-Control-Allow-Origin": "*"}
+    )
 
 UPLOADS_DIR = Path("./uploads")
 UPLOADS_DIR.mkdir(exist_ok=True)
